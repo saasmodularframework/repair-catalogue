@@ -1,7 +1,7 @@
 import {Platform} from 'react-native';
 import type {Scene} from '../lib/api';
 export const webUri=(path:string,seed:string,w=140,h=140)=>Platform.OS==='web'?path:`https://picsum.photos/seed/${seed}/${w}/${h}`;
-const ROOM_LINKS=[['workspace','01'],['hallway','02'],['kitchen','03'],['storage','04'],['laundry','06']];
+const ROOM_LINKS=[['workspace','01'],['hallway','02'],['kitchen','03'],['storage','04'],['laundry','06']]; // apartment-floor-template-01/02/03/04/06
 const TITLES=['Three-store Amsterdam-like cottage','Two-store industrial building','Residential loft apartment','Nine-store commercial tower','Ten-store renaissance skyscraper'];
 const OTHER=[['workspace','Workspace'],['kitchen','Kitchen'],['lounge','Lounge'],['balcony','Balcony'],['hallway','Hallway']];
 export const SCENES:Scene[]=TITLES.map((title,i)=>{const slug=`scene-0${i+1}`;

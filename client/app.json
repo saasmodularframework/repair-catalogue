@@ -1,0 +1,1 @@
+{"expo":{"name":"Repair Studio","slug":"repair-studio","scheme":"repair","web":{"bundler":"metro","output":"single"},"plugins":["expo-router"],"experiments":{"typedRoutes":false}}}

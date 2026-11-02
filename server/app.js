@@ -1,0 +1,44 @@
+const express=require('express'),cors=require('cors'),Redis=require('ioredis'),PDF=require('pdfkit'),mail=require('nodemailer');
+const {groups,rooms,services}=require('./data');
+const app=express();app.use(cors());app.use(express.json());
+const kv=process.env.VALKEY_URL?new Redis(process.env.VALKEY_URL,{maxRetriesPerRequest:2}):null; // Aiven Valkey speaks the Redis protocol
+const mem=new Map();
+const get=async k=>{const v=kv?await kv.get(k):mem.get(k);return v?JSON.parse(v):null};
+const set=async(k,v,ttl)=>{const s=JSON.stringify(v);kv?await kv.set(k,s,'EX',ttl||7776000):mem.set(k,s)};
+const SITE=process.env.SITE_URL||'http://localhost:8081';
+const DEFAULT_TAGS=['repair','construction','quality','estimate','warranty'];
+const makePosts=()=>services.map((s,i)=>{
+ const words=[...new Set(s.title.toLowerCase().replace(/[^a-z ]/g,' ').split(' ').filter(w=>w.length>3))];
+ const body=`${s.title}: scope survey, material accountancy, execution and handover. Page text is mirrored here so it can be searched, tagged and read offline.`;
+ return {id:s.slug,title:s.title,body,tags:[...words,...DEFAULT_TAGS].slice(0,5),
+  createdAt:new Date(Date.now()-i*36e5*7).toISOString(),readMin:Math.max(1,Math.ceil(body.split(' ').length/200))};});
+const r=express.Router();
+r.get('/catalog',(q,s)=>s.json({groups,rooms}));
+r.get('/posts',async(q,s)=>{let p=await get('posts');if(!p){p=makePosts();await set('posts',p)}s.json(p)});
+r.post('/posts',async(q,s)=>{const {title,body,tags=[]}=q.body||{};if(!title||!body)return s.status(400).json({error:'title and body required'});
+ const p=(await get('posts'))||makePosts();const post={id:Date.now().toString(36),title,body,tags:[...tags,...DEFAULT_TAGS].slice(0,5),createdAt:new Date().toISOString(),readMin:Math.max(1,Math.ceil(body.split(' ').length/200))};
+ await set('posts',[post,...p]);s.status(201).json(post)});
+r.post('/orders',async(q,s)=>{const {room,items,customer={}}=q.body||{};
+ if(!rooms.some(x=>x.slug===room)||!Array.isArray(items)||!items.length)return s.status(400).json({error:'valid room and items required'});
+ const id=Math.random().toString(36).slice(2,10);const o={id,room,items:items.slice(0,60).map(String),customer:{name:String(customer.name||''),phone:String(customer.phone||''),email:String(customer.email||''),address:String(customer.address||'')},createdAt:new Date().toISOString()};
+ await set('order:'+id,o);s.status(201).json(o)});
+const pdf=o=>{const d=new PDF({margin:50});const b=[];d.on('data',c=>b.push(c));
+ const done=new Promise(ok=>d.on('end',()=>ok(Buffer.concat(b))));
+ d.fontSize(22).text('Repair order #'+o.id);d.moveDown().fontSize(12).text('Room: '+o.room+'   Created: '+o.createdAt);d.moveDown();
+ if(o.customer)d.text(`Customer: ${o.customer.name} | ${o.customer.phone} | ${o.customer.email} | ${o.customer.address}`).moveDown();
+ o.items.forEach((t,i)=>d.text(`${i+1}. ${t}`));d.end();return done};
+r.get('/orders/:id/pdf',async(q,s)=>{const o=await get('order:'+q.params.id);if(!o)return s.sendStatus(404);
+ s.type('pdf').set('Content-Disposition',`inline; filename="order-${o.id}.pdf"`).send(await pdf(o))});
+r.post('/orders/:id/email',async(q,s)=>{const o=await get('order:'+q.params.id);const to=q.body&&q.body.email;
+ if(!o||!/^\S+@\S+\.\S+$/.test(to||''))return s.status(400).json({error:'order and valid email required'});
+ if(!process.env.SMTP_URL)return s.status(501).json({error:'SMTP_URL not configured'});
+ await mail.createTransport(process.env.SMTP_URL).sendMail({from:process.env.MAIL_FROM,to,subject:'Repair order '+o.id,text:'Your order is attached.',attachments:[{filename:`order-${o.id}.pdf`,content:await pdf(o)}]});
+ s.json({sent:true})});
+r.get('/rss/:slug.xml',async(q,s)=>{const t=[...services,...rooms].find(x=>x.slug===q.params.slug);if(!t)return s.sendStatus(404);
+ const posts=(await get('posts'))||makePosts();const e=x=>String(x).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+ s.type('application/rss+xml').send(`<?xml version="1.0"?><rss version="2.0"><channel><title>${e(t.title)}</title><link>${SITE}</link><description>${e(t.title)}</description>${posts.filter(p=>p.id===t.slug||p.tags.includes(t.slug)||!services.includes(t)).slice(0,20).map(p=>`<item><title>${e(p.title)}</title><link>${SITE}/blog</link><pubDate>${new Date(p.createdAt).toUTCString()}</pubDate><description>${e(p.body)}</description></item>`).join('')}</channel></rss>`)});
+require('./extra')(r,get,set);
+app.use('/api',r);
+app.get('/sitemap.xml',(q,s)=>{const u=['','blog','order','sitemap',...services.map(x=>'service/'+x.slug),...rooms.map(x=>'room/'+x.slug)];
+ s.type('xml').send(`<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${u.map(x=>`<url><loc>${SITE}/${x}</loc></url>`).join('')}</urlset>`)});
+module.exports=app;

@@ -6,7 +6,7 @@
   "manifest": "node scripts/manifest.js",
   "start": "npm run manifest && expo start",
   "web": "npm run manifest && expo start --web",
-  "build": "npm run manifest && expo export -p web"
+  "build": "expo export --platform web"
  },
  "dependencies": {
   "expo": "~52.0.0",

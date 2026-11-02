@@ -32,5 +32,5 @@
 ## System Endpoints & Routing
 
 - **Sitemap**: `<server>/sitemap.xml`
-- **RSS **: `<server>/api/rss/<slug>.xml`
+- **RSS**: `<server>/api/rss/<slug>.xml`
 - **PDF Format**: `<server>/api/orders/<id>/pdf`

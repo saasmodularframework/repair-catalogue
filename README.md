@@ -2,8 +2,6 @@
 
 ---
 
-
-
 ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white)
@@ -34,3 +32,5 @@
 - **Sitemap**: `<server>/sitemap.xml`
 - **RSS**: `<server>/api/rss/<slug>.xml`
 - **PDF Format**: `<server>/api/orders/<id>/pdf`
+
+
